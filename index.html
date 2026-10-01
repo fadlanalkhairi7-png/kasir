@@ -43,7 +43,8 @@ body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:1
 .tabs button{font:inherit;font-weight:700;font-size:.9rem;background:none;border:0;border-bottom:3px solid transparent;color:var(--muted);padding:.55rem .8rem;cursor:pointer;white-space:nowrap}
 .tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
 main{max-width:1180px;margin:0 auto;padding-inline:16px;padding-block:20px 80px}
-section.tab{display:grid;gap:20px}
+section.tab{display:grid;gap:20px;grid-template-columns:minmax(0,1fr)}
+section.tab>*{min-width:0}
 h2{font-family:var(--f-display);font-weight:600;font-size:1.3rem;margin:0}
 h3{font-size:.8rem;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin:0}
 
@@ -219,6 +220,7 @@ button.sdot{border:0;padding:0;width:12px;height:12px;cursor:pointer}
       <button role="tab" data-tab="label">Label Barcode</button>
       <button role="tab" data-tab="pelanggan">Pelanggan</button>
       <button role="tab" data-tab="riwayat">Riwayat</button>
+      <button role="tab" data-tab="laporan">Laporan</button>
       <button role="tab" data-tab="pengguna">Pengguna</button>
       <button role="tab" data-tab="pengaturan">Pengaturan</button>
     </nav>
@@ -302,17 +304,25 @@ button.sdot{border:0;padding:0;width:12px;height:12px;cursor:pointer}
           <div class="scanbar"><input id="bSku" placeholder="Otomatis, atau scan barcode pabrik"><button type="button" class="btn ghost" id="bScanSku">Scan</button></div>
           <p class="hint">Kalau barang sudah punya barcode dari pabrik, scan saja ke sini. Kalau tidak, biarkan kode otomatis.</p>
         </div>
+        <div class="field">
+          <span class="lbl" id="bCaraLbl">Cara memasukkan modal</span>
+          <div class="seg" role="group" aria-labelledby="bCaraLbl">
+            <button type="button" id="bCaraPotong" aria-pressed="false">Per potong</button>
+            <button type="button" id="bCaraGrosir" aria-pressed="true">Per lusin / kodi / bal…</button>
+          </div>
+          <p class="hint" id="bRumus">Rumus kode: (modal ÷ isi + untung) × 2</p>
+        </div>
         <div class="row">
           <div class="field">
-            <label for="bModal">Harga modal</label>
+            <label for="bModal" id="bModalLbl">Harga modal</label>
             <div class="money"><span>Rp</span><input id="bModal" class="numin" inputmode="numeric" value="36.000"></div>
           </div>
-          <div class="field">
+          <div class="field" id="bSatuanW">
             <label for="bSatuan">Modal per (satuan)</label>
             <input id="bSatuan" list="satuanList" value="Lusin">
             <datalist id="satuanList"><option value="Potong"></option><option value="1/2 Lusin"></option><option value="Lusin"></option><option value="Kodi"></option><option value="Gros"></option><option value="Rim"></option><option value="Bal"></option><option value="Pak"></option><option value="Dus"></option><option value="Karton"></option></datalist>
           </div>
-          <div class="field">
+          <div class="field" id="bIsiW">
             <label for="bIsi">Isi (berapa potong)</label>
             <input id="bIsi" class="numin" inputmode="numeric" value="12">
           </div>
@@ -481,6 +491,38 @@ button.sdot{border:0;padding:0;width:12px;height:12px;cursor:pointer}
         <thead><tr><th>Waktu</th><th>No.</th><th>Kasir</th><th>Pelanggan</th><th class="num">Barang</th><th class="num">Total</th><th class="num" id="thLaba">Laba</th><th></th></tr></thead>
         <tbody id="tbTrx"></tbody>
       </table>
+    </div>
+  </section>
+
+  <!-- ================= LAPORAN (pemilik) ================= -->
+  <section class="tab" id="tab-laporan" hidden>
+    <div class="toolbar">
+      <h2>Laporan toko</h2>
+      <div class="seg" role="group" aria-label="Jenis laporan" style="min-width:min(100%,420px)">
+        <button type="button" data-lp="jual" aria-pressed="true">Penjualan</button>
+        <button type="button" data-lp="stok" aria-pressed="false">Stok toko</button>
+        <button type="button" data-lp="masuk" aria-pressed="false">Barang masuk</button>
+      </div>
+    </div>
+    <div class="toolbar">
+      <div class="actions">
+        <select id="lpRentang" aria-label="Rentang waktu">
+          <option value="hari">Hari ini</option><option value="kemarin">Kemarin</option><option value="7">7 hari terakhir</option>
+          <option value="bulan">Bulan ini</option><option value="semua">Semua (90 hari terakhir)</option><option value="tgl">Pilih tanggal…</option>
+        </select>
+        <input type="date" id="lpTgl" hidden aria-label="Tanggal">
+      </div>
+      <input type="search" id="lpCari" placeholder="Cari nama atau kode barang" aria-label="Cari barang">
+    </div>
+    <div class="stats" id="lpStats"></div>
+    <div id="lpRekapW">
+      <h3 style="margin-bottom:8px">Rekap per barang</h3>
+      <div class="tablewrap"><table><thead><tr><th>Nama Barang</th><th class="num">Jumlah</th><th class="num">Total Modal</th><th class="num">Total Jual</th><th class="num">Untung</th></tr></thead><tbody id="lpRekap"></tbody></table></div>
+    </div>
+    <div>
+      <h3 style="margin-bottom:8px" id="lpJudulTabel">Barang keluar</h3>
+      <div class="tablewrap"><table><thead id="lpHead"></thead><tbody id="lpBody"></tbody></table></div>
+      <p class="hint" id="lpCatatan" style="margin-top:8px"></p>
     </div>
   </section>
 
@@ -736,7 +778,7 @@ function beep(ok=true){
 }
 
 /* ---------- Tab ---------- */
-const TABS = ['kasir','barang','stokmasuk','label','pelanggan','riwayat','pengguna','pengaturan'];
+const TABS = ['kasir','barang','stokmasuk','label','pelanggan','riwayat','laporan','pengguna','pengaturan'];
 const ROLES = {
   admin:   {nama:'Admin / Pemilik', tabs:TABS, modal:true, ubahBarang:true, masuk:true, batal:true, laporan:true,
             info:'Semua menu: kasir, barang dan modal, stok, laporan laba, pengguna, Google Sheets.'},
@@ -756,7 +798,7 @@ function showTab(t){
   document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === t));
   TABS.forEach(x => $('tab-'+x).hidden = x !== t);
   try{ localStorage.setItem('toko-tab-' + me.id, t); }catch(e){}
-  ({kasir:renderKasir, barang:renderBarangList, stokmasuk:renderMasuk, label:renderLabel, pelanggan:renderPel, riwayat:renderRiwayat, pengguna:renderUser, pengaturan:renderSet})[t]();
+  ({kasir:renderKasir, barang:renderBarangList, stokmasuk:renderMasuk, label:renderLabel, pelanggan:renderPel, riwayat:renderRiwayat, laporan:renderLaporan, pengguna:renderUser, pengaturan:renderSet})[t]();
   if(t === 'kasir' && finePointer) setTimeout(()=> $('scan').focus(), 50);
 }
 document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
@@ -1112,6 +1154,7 @@ function formBarang(){
 }
 function hitungForm(){
   const f = formBarang(), h = hitung(f);
+  $('bPerPcs').hidden = bCara === 'potong';
   $('bPerPcs').innerHTML = f.isi > 1 ? `Modal per potong: <strong>${rp(f.modal)} ÷ ${fmt2(f.isi)} = Rp ${fmt2(h.perPcs)}</strong>` : `Modal per potong: <strong>Rp ${fmt2(h.perPcs)}</strong>`;
   $('bKode').textContent = fmt(h.kode);
   $('bHarga').textContent = fmt(h.harga);
@@ -1121,6 +1164,21 @@ function hitungForm(){
 }
 ['bModal','bIsi','bUntung','bPct','bBulat'].forEach(id => $(id).addEventListener('input', hitungForm));
 $('bSatuan').addEventListener('input', () => { const k = norm($('bSatuan').value); if(ISI_BAKU[k]) $('bIsi').value = fmt(ISI_BAKU[k]); hitungForm(); });
+let bCara = 'grosir';
+try { bCara = localStorage.getItem('toko-bcara') || 'grosir'; } catch(e) {}
+function setBCara(c, dariTombol){
+  bCara = c;
+  $('bCaraPotong').setAttribute('aria-pressed', c === 'potong'); $('bCaraGrosir').setAttribute('aria-pressed', c === 'grosir');
+  $('bSatuanW').hidden = c === 'potong'; $('bIsiW').hidden = c === 'potong';
+  $('bModalLbl').textContent = c === 'potong' ? 'Harga modal per potong' : 'Harga modal';
+  $('bRumus').textContent = c === 'potong' ? 'Rumus kode: (modal per potong + untung) × 2' : 'Rumus kode: (modal ÷ isi + untung) × 2';
+  if(c === 'potong'){ $('bSatuan').value = 'Potong'; $('bIsi').value = '1'; }
+  else if(dariTombol && norm($('bSatuan').value) === 'potong'){ $('bSatuan').value = 'Lusin'; $('bIsi').value = '12'; }
+  if(dariTombol) try { localStorage.setItem('toko-bcara', c); } catch(e) {}
+  hitungForm();
+}
+$('bCaraPotong').addEventListener('click', () => setBCara('potong', true));
+$('bCaraGrosir').addEventListener('click', () => setBCara('grosir', true));
 function setBMode(m){ bMode = m; $('bModeRp').setAttribute('aria-pressed', m==='rp'); $('bModePct').setAttribute('aria-pressed', m==='pct'); $('bUntungRpW').hidden = m!=='rp'; $('bUntungPctW').hidden = m!=='pct'; hitungForm(); }
 $('bModeRp').addEventListener('click', () => setBMode('rp'));
 $('bModePct').addEventListener('click', () => setBMode('pct'));
@@ -1151,6 +1209,7 @@ function isiForm(b){
   $('bStok').value = b ? fmt(b.stok) : '0';
   $('bMasuk').value = '';
   setBMode(b ? (b.mode || 'rp') : 'rp');
+  setBCara(b ? ((Number(b.isi) === 1 && ['potong','pcs','biji','buah'].includes(norm(b.satuan))) ? 'potong' : 'grosir') : bCara, false);
 }
 $('fBaru').addEventListener('click', () => { isiForm(null); $('bNama').focus(); });
 $('fBarang').addEventListener('submit', e => {
@@ -1457,6 +1516,89 @@ function renderMasuk(){
     : '<tr><td colspan="5" class="empty">Belum ada stok masuk di rentang ini.</td></tr>';
 }
 
+/* =================== LAPORAN (PEMILIK) =================== */
+let lpJenis = 'jual';
+document.querySelectorAll('[data-lp]').forEach(b => b.addEventListener('click', () => {
+  lpJenis = b.dataset.lp; document.querySelectorAll('[data-lp]').forEach(x => x.setAttribute('aria-pressed', x === b)); renderLaporan();
+}));
+$('lpRentang').addEventListener('change', () => { $('lpTgl').hidden = $('lpRentang').value !== 'tgl'; if(!$('lpTgl').hidden && !$('lpTgl').value) $('lpTgl').valueAsDate = new Date(); renderLaporan(); });
+$('lpTgl').addEventListener('change', renderLaporan);
+$('lpCari').addEventListener('input', renderLaporan);
+function lpRentang(){
+  const r = $('lpRentang').value, now = new Date(), start = +new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if(r === 'hari') return [start, Infinity];
+  if(r === 'kemarin') return [start - 864e5, start];
+  if(r === '7') return [start - 6*864e5, Infinity];
+  if(r === 'bulan') return [+new Date(now.getFullYear(), now.getMonth(), 1), Infinity];
+  if(r === 'tgl' && $('lpTgl').value){ const [y,m,d] = $('lpTgl').value.split('-').map(Number); const f = +new Date(y,m-1,d); return [f, f + 864e5]; }
+  return [0, Infinity];
+}
+const tglSaja = ts => new Date(ts).toLocaleDateString('id-ID', {day:'2-digit', month:'2-digit', year:'numeric'});
+const namaHp = t => t.hpNama || (db.hp && t.hpId === db.hp.id ? db.hp.nama : '') || '–';
+function th(cols){ return '<tr>' + cols.map(c => `<th${c[1] ? ' class="num"' : ''}>${c[0]}</th>`).join('') + '</tr>'; }
+function stat(lbl, v, sub){ return `<div class="stat"><div class="lbl">${lbl}</div><div class="v">${v}</div>${sub ? `<div class="hint">${sub}</div>` : ''}</div>`; }
+function renderLaporan(){
+  if(!can('modal') || !me || me.role !== 'admin') return;
+  const q = norm($('lpCari').value);
+  const cocok = (nama, sku) => !q || norm(nama).includes(q) || norm(sku).includes(q);
+  $('lpRentang').parentNode.hidden = lpJenis === 'stok';
+  $('lpRekapW').hidden = lpJenis !== 'jual';
+  const MAKS = 500;
+
+  if(lpJenis === 'jual'){
+    const [from, to] = lpRentang();
+    const rows = [];
+    db.trx.filter(t => t.waktu >= from && t.waktu < to).sort((a,b) => b.waktu - a.waktu).forEach(t => {
+      t.items.forEach(i => {
+        if(!cocok(i.nama, i.sku)) return;
+        const modal = Math.round((i.modal||0)*100)/100, tm = Math.round(modal*i.qty), tj = i.harga*i.qty;
+        rows.push({t, nama:i.nama, sku:i.sku, qty:i.qty, modal, kode:i.kode ?? i.harga*2, harga:i.harga, normal:i.hargaNormal, tm, tj, u:tj - tm});
+      });
+      if(t.diskon && !q) rows.push({t, nama:'(Diskon transaksi)', sku:'', qty:0, modal:0, kode:0, harga:0, tm:0, tj:-t.diskon, u:-t.diskon});
+    });
+    const sum = k => rows.reduce((a,r) => a + r[k], 0);
+    const nTrx = new Set(rows.map(r => r.t.id)).size;
+    $('lpStats').innerHTML = stat('Total jual', rp(sum('tj'))) + stat('Total modal', rp(sum('tm'))) + stat('Untung', rp(sum('u'))) + stat('Barang terjual', fmt(sum('qty')), `${fmt(nTrx)} transaksi`);
+    const rek = {};
+    rows.filter(r => r.qty > 0).forEach(r => { const k = r.nama; rek[k] = rek[k] || {nama:k, qty:0, tm:0, tj:0, u:0}; rek[k].qty += r.qty; rek[k].tm += r.tm; rek[k].tj += r.tj; rek[k].u += r.u; });
+    const rekL = Object.values(rek).sort((a,b) => b.qty - a.qty);
+    $('lpRekap').innerHTML = rekL.length ? rekL.map(r => `<tr><td class="wrap"><b>${esc(r.nama)}</b></td><td class="num">${fmt(r.qty)}</td><td class="num">${fmt(r.tm)}</td><td class="num">${fmt(r.tj)}</td><td class="num">${fmt(r.u)}</td></tr>`).join('') : '<tr><td colspan="5" class="empty">Belum ada penjualan di rentang ini.</td></tr>';
+    $('lpJudulTabel').textContent = 'Barang keluar (rincian)';
+    $('lpHead').innerHTML = th([['Tanggal'],['Jam'],['No. Transaksi'],['HP'],['Kasir'],['Pelanggan'],['Nama Barang'],['Kode Barang'],['Jumlah',1],['Modal / potong',1],['Kode Harga',1],['Harga Jual',1],['Total Modal',1],['Total Jual',1],['Untung',1]]);
+    $('lpBody').innerHTML = rows.length ? rows.slice(0, MAKS).map(r => `<tr><td>${tglSaja(r.t.waktu)}</td><td>${hm(r.t.waktu)}</td><td class="mono">${esc(r.t.no)}</td><td>${esc(namaHp(r.t))}</td><td>${esc(r.t.kasir || '–')}</td><td>${esc(r.t.namaPelanggan || 'Umum')}</td>
+      <td class="wrap">${esc(r.nama)}</td><td>${esc(r.sku)}</td><td class="num">${fmt(r.qty)}</td><td class="num">${fmt2(r.modal)}</td><td class="num">${fmt(r.kode)}</td>
+      <td class="num">${fmt(r.harga)}${r.normal ? `<br><span class="chip warn">ditawar dari ${fmt(r.normal)}</span>` : ''}</td><td class="num">${fmt(r.tm)}</td><td class="num">${fmt(r.tj)}</td><td class="num">${r.u < 0 ? `<span class="chip bad">${fmt(r.u)}</span>` : fmt(r.u)}</td></tr>`).join('')
+      : '<tr><td colspan="15" class="empty">Belum ada penjualan di rentang ini.</td></tr>';
+    $('lpCatatan').textContent = (rows.length > MAKS ? `Menampilkan ${MAKS} dari ${fmt(rows.length)} baris. Persempit rentang atau cari nama barang. ` : '') + 'HP menyimpan riwayat 90 hari terakhir. Riwayat yang lebih lama tetap lengkap di Google Sheets.';
+  }
+
+  else if(lpJenis === 'stok'){
+    const list = db.barang.filter(b => cocok(b.nama, b.sku)).slice().sort((a,b) => a.nama.localeCompare(b.nama));
+    const rows = list.map(b => { const mp = modalPcs(b), st = b.stok || 0; return {b, mp, st, nm:Math.round(mp*st), nj:b.harga*st}; });
+    const sum = k => rows.reduce((a,r) => a + r[k], 0);
+    const habis = rows.filter(r => r.st <= 0).length, menipis = rows.filter(r => r.st > 0 && r.st <= 5).length;
+    $('lpStats').innerHTML = stat('Jenis barang', fmt(rows.length)) + stat('Total stok', fmt(sum('st')) + ' potong') + stat('Nilai modal stok', rp(sum('nm'))) + stat('Nilai jual stok', rp(sum('nj')), `${habis} habis · ${menipis} menipis`);
+    $('lpJudulTabel').textContent = 'Stok toko (barang yang tinggal)';
+    $('lpHead').innerHTML = th([['Kode Barang'],['Nama Barang'],['Satuan Beli'],['Isi (potong)',1],['Modal / satuan',1],['Modal / potong',1],['Kode Harga',1],['Harga Jual',1],['Untung / potong',1],['Sisa Stok',1],['Nilai Modal Stok',1],['Nilai Jual Stok',1]]);
+    $('lpBody').innerHTML = rows.length ? rows.map(({b, mp, st, nm, nj}) => `<tr><td>${esc(b.sku)}</td><td class="wrap"><b>${esc(b.nama)}</b></td><td>${esc(b.satuan)}</td><td class="num">${fmt2(b.isi)}</td><td class="num">${fmt(b.modal)}</td><td class="num">${fmt2(mp)}</td>
+      <td class="num">${fmt(b.kode)}</td><td class="num">${fmt(b.harga)}</td><td class="num">${fmt(b.harga - mp)}</td>
+      <td class="num">${st <= 0 ? `<span class="chip bad">${fmt(st)}</span>` : st <= 5 ? `<span class="chip warn">${fmt(st)}</span>` : fmt(st)}</td><td class="num">${fmt(nm)}</td><td class="num">${fmt(nj)}</td></tr>`).join('')
+      : '<tr><td colspan="12" class="empty">Belum ada barang.</td></tr>';
+    $('lpCatatan').textContent = 'Stok merah = habis atau minus, kuning = tinggal 5 potong atau kurang.' + (sinkronAktif() && db.gs.last ? ` Stok gabungan semua HP per ${tgl(db.gs.last)}.` : '');
+  }
+
+  else {
+    const [from, to] = lpRentang();
+    const list = db.masuk.filter(m => m.waktu >= from && m.waktu < to && cocok(m.nama, m.sku)).sort((a,b) => b.waktu - a.waktu);
+    $('lpStats').innerHTML = stat('Catatan masuk', fmt(list.length)) + stat('Total potong masuk', fmt(list.filter(m => m.qty > 0).reduce((a,m) => a + m.qty, 0))) + stat('Penyesuaian minus', fmt(list.filter(m => m.qty < 0).reduce((a,m) => a + m.qty, 0)));
+    $('lpJudulTabel').textContent = 'Barang masuk';
+    $('lpHead').innerHTML = th([['Tanggal'],['Jam'],['HP'],['Petugas'],['Kode Barang'],['Nama Barang'],['Jumlah (potong)',1],['Keterangan']]);
+    $('lpBody').innerHTML = list.length ? list.slice(0, MAKS).map(m => `<tr><td>${tglSaja(m.waktu)}</td><td>${hm(m.waktu)}</td><td>${esc(m.hpNama || (db.hp && db.hp.nama) || '–')}</td><td>${esc(m.petugas || '–')}</td><td>${esc(m.sku)}</td><td class="wrap">${esc(m.nama)}</td><td class="num">${m.qty > 0 ? '+' : ''}${fmt(m.qty)}</td><td class="wrap">${esc(m.ket)}</td></tr>`).join('')
+      : '<tr><td colspan="8" class="empty">Belum ada barang masuk di rentang ini.</td></tr>';
+    $('lpCatatan').textContent = list.length > MAKS ? `Menampilkan ${MAKS} dari ${fmt(list.length)} baris.` : '';
+  }
+}
+
 /* =================== PENGGUNA =================== */
 function hashPin(pin){ let h = 0x811c9dc5; const str = 'toko|' + pin; for(let i=0;i<str.length;i++){ h ^= str.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return h.toString(16); }
 const pinOk = p => /^\d{4,6}$/.test(p);
@@ -1638,6 +1780,7 @@ function segarkanTampilan(){
   else if(t === 'stokmasuk') renderMasuk();
   else if(t === 'pelanggan') renderPel();
   else if(t === 'riwayat') renderRiwayat();
+  else if(t === 'laporan') renderLaporan();
   else if(t === 'pengguna') renderUser();
   else if(t === 'pengaturan') renderGs();
 }
