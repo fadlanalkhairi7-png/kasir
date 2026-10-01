@@ -109,6 +109,11 @@ tr:last-child td{border-bottom:0}
 .qty button{font:inherit;font-weight:700;width:32px;height:34px;border:0;background:var(--bg);color:var(--ink);cursor:pointer}
 .qty input{width:46px;border:0;border-radius:0;text-align:center;padding:.3rem;font-family:var(--f-mono);background:var(--surface)}
 .ci .tot{font-family:var(--f-mono);font-weight:700;min-width:84px;text-align:right}
+.hbtn{font:inherit;font-size:inherit;color:inherit;background:none;border:0;border-bottom:1px dashed var(--muted);padding:0;cursor:pointer}
+.hbtn s{opacity:.7}
+.tawar{display:grid;grid-template-columns:minmax(0,150px) auto auto auto;gap:6px;align-items:center;margin-top:4px}
+.tawar input{padding-block:.35rem}
+@media (max-width:520px){.tawar{grid-template-columns:1fr auto}}
 .x{font:inherit;border:0;background:none;color:var(--danger);font-size:1.2rem;cursor:pointer;padding:0 4px;line-height:1}
 @media (max-width:520px){.ci{grid-template-columns:minmax(0,1fr) auto;}.ci .tot{grid-column:1}.ci .x{grid-column:2;grid-row:1}.ci .qty{grid-column:2;grid-row:2}.ci .tot{grid-row:2;text-align:left}}
 .totalbox{background:var(--sticker);color:var(--sticker-ink);border-radius:10px;padding:14px 18px;display:grid;gap:2px}
@@ -711,9 +716,10 @@ function toHuruf(n, s){ return String(Math.round(n)).split('').map(d => s[d === 
 function kodeTeks(b){ return fmt(b.kode); }
 function tgl(ts){ const d = new Date(ts); return d.toLocaleDateString('id-ID',{day:'2-digit',month:'2-digit',year:'2-digit'}) + ' ' + d.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'}); }
 function sameDay(a,b){ return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate(); }
-document.querySelectorAll('.numin').forEach(el => el.addEventListener('input', () => {
+document.addEventListener('input', e => {
+  const el = e.target; if(!el.classList || !el.classList.contains('numin')) return;
   const raw = el.value.replace(/[^\d]/g,''); el.value = raw ? Number(raw).toLocaleString('id-ID') : '';
-}));
+}, true);
 document.querySelectorAll('dialog [data-close]').forEach(b => b.addEventListener('click', () => b.closest('dialog').close()));
 document.querySelectorAll('.frameNote').forEach(p => p.textContent = diFrame ? 'Di halaman pratinjau ini, cetak, kamera, dan simpan file diblokir. Buka file Kasir-Toko.html di HP atau komputer untuk memakainya.' : '');
 $('tglH').textContent = new Date().toLocaleDateString('id-ID',{weekday:'long', day:'numeric', month:'long', year:'numeric'});
@@ -835,7 +841,7 @@ document.addEventListener('click', e => { if(!e.target.closest('.scanbar')) $('s
 
 function cartLines(){
   cart = cart.filter(l => findB(l.id));
-  return cart.map(l => { const b = findB(l.id); return {b, qty:l.qty, sub:b.harga*l.qty}; });
+  return cart.map(l => { const b = findB(l.id); const harga = l.harga ?? b.harga; return {b, qty:l.qty, harga, tawar: l.harga !== undefined && l.harga !== b.harga, sub:harga*l.qty}; });
 }
 function totals(){
   const lines = cartLines();
@@ -845,25 +851,52 @@ function totals(){
 }
 function renderCart(){
   const {lines} = totals();
-  $('cart').innerHTML = lines.length ? lines.map(({b,qty,sub}) => `
+  $('cart').innerHTML = lines.length ? lines.map(({b,qty,sub,harga,tawar}) => `
     <div class="ci" data-id="${b.id}">
-      <div><div class="nm">${esc(b.nama)}</div><div class="sub"><span class="mono">${fmt(b.harga)}</span> · ${esc(b.sku)} ${qty > (b.stok||0) ? `<span class="chip bad">stok ${fmt(b.stok||0)}</span>` : ''}</div></div>
+      <div><div class="nm">${esc(b.nama)}</div>
+        ${editHarga === b.id
+          ? `<div class="tawar"><div class="money"><span>Rp</span><input class="numin" data-hin inputmode="numeric" value="${fmt(harga)}" aria-label="Harga tawar ${esc(b.nama)}"></div><button type="button" class="btn small" data-hok>OK</button>${tawar ? '<button type="button" class="btn link small" data-hnormal>Harga normal</button>' : ''}<button type="button" class="btn link small" data-hbatal>Batal</button></div>
+             <div class="sub">Harga normal <span class="mono">${fmt(b.harga)}</span></div>`
+          : `<div class="sub"><button type="button" class="hbtn" data-harga title="Ubah harga (tawar)">${tawar ? `<s class="mono">${fmt(b.harga)}</s> <b class="mono">${fmt(harga)}</b> <span class="chip warn">ditawar</span>` : `<span class="mono">${fmt(harga)}</span>`} ✎</button> · ${esc(b.sku)} ${qty > (b.stok||0) ? `<span class="chip bad">stok ${fmt(b.stok||0)}</span>` : ''}</div>`}
+      </div>
       <div class="qty"><button type="button" data-d="-1" aria-label="Kurangi">−</button><input value="${qty}" inputmode="numeric" aria-label="Jumlah ${esc(b.nama)}"><button type="button" data-d="1" aria-label="Tambah">+</button></div>
       <div class="tot">${fmt(sub)}</div>
       <button type="button" class="x" data-del aria-label="Hapus ${esc(b.nama)}">×</button>
     </div>`).join('') : `<div class="empty">Belum ada barang. Scan barcode atau ketik nama barang di kotak atas.</div>`;
   renderBayar();
 }
+let editHarga = null;
+function simpanTawar(row, l){
+  const b = findB(l.id), v = Math.round(parseNum(row.querySelector('[data-hin]').value));
+  if(!v){ toast('Isi harga tawarnya'); return false; }
+  const modal = modalPcs(b);
+  if(v < modal){
+    if(!can('modal')){ toast('Harga itu terlalu rendah (di bawah modal). Minta pemilik toko yang memasukkan harganya.'); beep(false); return false; }
+    toast(`Perhatian: di bawah modal, rugi ${rp(modal - v)} per potong`);
+  } else if(v !== b.harga) toast(`Harga ${b.nama} jadi ${fmt(v)} (normal ${fmt(b.harga)})`);
+  if(v === b.harga) delete l.harga; else l.harga = v;
+  return true;
+}
+$('cart').addEventListener('keydown', e => {
+  if(!e.target.matches('[data-hin]')) return;
+  const row = e.target.closest('.ci'), l = cart.find(x => x.id === row.dataset.id);
+  if(e.key === 'Enter'){ e.preventDefault(); if(simpanTawar(row, l)){ editHarga = null; saveCart(); renderCart(); } }
+  else if(e.key === 'Escape'){ editHarga = null; renderCart(); }
+});
 $('cart').addEventListener('click', e => {
   const row = e.target.closest('.ci'); if(!row) return;
   const l = cart.find(x => x.id === row.dataset.id); if(!l) return;
-  if(e.target.closest('[data-del]')) cart = cart.filter(x => x !== l);
+  if(e.target.closest('[data-harga]')){ editHarga = l.id; renderCart(); const i = $('cart').querySelector(`.ci[data-id="${l.id}"] [data-hin]`); if(i){ i.focus(); i.select(); } return; }
+  if(e.target.closest('[data-hok]')){ if(!simpanTawar(row, l)) return; editHarga = null; }
+  else if(e.target.closest('[data-hnormal]')){ delete l.harga; editHarga = null; toast('Harga kembali normal'); }
+  else if(e.target.closest('[data-hbatal]')){ editHarga = null; }
+  else if(e.target.closest('[data-del]')) cart = cart.filter(x => x !== l);
   else if(e.target.closest('[data-d]')) { l.qty += Number(e.target.closest('[data-d]').dataset.d); if(l.qty < 1) cart = cart.filter(x => x !== l); }
   else return;
   saveCart(); renderCart();
 });
 $('cart').addEventListener('change', e => {
-  if(e.target.tagName !== 'INPUT') return;
+  if(e.target.tagName !== 'INPUT' || e.target.matches('[data-hin]')) return;
   const row = e.target.closest('.ci'), l = cart.find(x => x.id === row.dataset.id);
   const n = parseInt(e.target.value.replace(/[^\d]/g,''))||0;
   if(n < 1) cart = cart.filter(x => x !== l); else l.qty = n;
@@ -927,7 +960,7 @@ function bayar(cetak){
   const p = db.pelanggan.find(x => norm(x.nama) === norm(n));
   const trx = {id:uid(), no:noTrx(), waktu:Date.now(), hpId: db.hp && db.hp.id || null, pelangganId:p ? p.id : null, namaPelanggan:n,
     kasir: me ? me.nama : '',
-    items:t.lines.map(({b,qty}) => ({id:b.id, sku:b.sku, nama:b.nama, harga:b.harga, kode:b.kode, modal:modalPcs(b), qty})),
+    items:t.lines.map(({b,qty,harga,tawar}) => Object.assign({id:b.id, sku:b.sku, nama:b.nama, harga, kode:b.kode, modal:modalPcs(b), qty}, tawar ? {hargaNormal:b.harga} : {})),
     subtotal:t.subtotal, diskon:t.diskon, total:t.total, bayar:uang, kembali:uang - t.total};
   t.lines.forEach(({b,qty}) => { b.stok = (b.stok||0) - qty; });
   db.trx.push(trx); op({op:'jual', trx:trxKirim(trx)}); save(); jadwalKirim();
@@ -953,6 +986,7 @@ function strukHTML(t){
     ${t.namaPelanggan ? `<div>Pelanggan: ${esc(t.namaPelanggan)}</div>` : ''}
     <div class="hr"></div>
     ${t.items.map(i => `<div class="nm">${esc(i.nama)}</div><div class="r"><span>${fmt(i.qty)} x ${fmt(i.harga)}</span><span>${fmt(i.qty*i.harga)}</span></div>`).join('')}
+    ${(() => { const h = t.items.reduce((a,i) => a + (i.hargaNormal ? (i.hargaNormal - i.harga) * i.qty : 0), 0); return h > 0 ? `<div class="r"><span>Hemat (tawar)</span><span>${fmt(h)}</span></div>` : ''; })()}
     <div class="hr"></div>
     <div class="r"><span>${fmt(qty)} barang</span><span></span></div>
     <div class="r"><span>Subtotal</span><span>${fmt(t.subtotal)}</span></div>

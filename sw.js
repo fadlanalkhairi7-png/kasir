@@ -1,5 +1,5 @@
 // Kasir Toko - service worker: aplikasi tetap terbuka walau tanpa internet.
-const CACHE = 'kasir-toko-v1';
+const CACHE = 'kasir-toko-v2';
 const INTI = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
